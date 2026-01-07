@@ -394,15 +394,6 @@ int32_t cpp_actor_send(
     const void* msg_data
 );
 
-// Send a message to a C++ actor (sync - blocks until processed)
-// Returns 0 on success, -1 if actor not found, -2 if unknown message type
-int32_t cpp_actor_fast_send(
-    const char* actor_name,
-    const char* sender_name,
-    int32_t msg_type,
-    const void* msg_data
-);
-
 } // extern "C"
 ''')
 
@@ -540,39 +531,6 @@ int32_t cpp_actor_send(
             f.write(f'                )\n')
             f.write(f'            );\n')
             f.write(f'            actor->send(cpp_msg, sender);\n')
-            f.write(f'            break;\n')
-            f.write(f'        }}\n')
-
-        f.write('''        default:
-            return -2; // Unknown message type
-    }
-
-    return 0;
-}
-
-int32_t cpp_actor_fast_send(
-    const char* actor_name,
-    const char* sender_name,
-    int32_t msg_type,
-    const void* msg_data
-) {
-    if (!actor_name || !msg_data || !g_manager) return -1;
-
-    actors::Actor* actor = g_manager->get_actor_by_name(actor_name);
-    if (!actor) return -1;  // Actor not found
-
-    actors::Actor* sender = get_sender_proxy(sender_name, actor_name);
-
-    // Dispatch based on message type (sync version)
-    switch (msg_type) {
-''')
-
-        for msg in messages:
-            f.write(f'        case {msg.msg_id}: {{\n')
-            f.write(f'            msg::{msg.name} cpp_msg = msg::{msg.name}::from_c_struct(\n')
-            f.write(f'                *static_cast<const ::{msg.name}*>(msg_data)\n')
-            f.write(f'            );\n')
-            f.write(f'            actor->fast_send(&cpp_msg, sender);\n')
             f.write(f'            break;\n')
             f.write(f'        }}\n')
 
@@ -722,52 +680,6 @@ pub extern "C" fn rust_actor_send(
 
     0  // Success
 }
-
-/// Send a message to a Rust actor (sync - blocks until processed)
-/// Returns 0 on success, -1 if actor not found, -2 if unknown message type
-#[no_mangle]
-pub extern "C" fn rust_actor_fast_send(
-    actor_name: *const c_char,
-    sender_name: *const c_char,
-    msg_type: c_int,
-    msg_data: *const c_void,
-) -> c_int {
-    if actor_name.is_null() || msg_data.is_null() {
-        return -1;
-    }
-
-    let name = match unsafe { CStr::from_ptr(actor_name).to_str() } {
-        Ok(s) => s,
-        Err(_) => return -1,
-    };
-
-    let mgr = match get_manager() {
-        Some(m) => m,
-        None => return -1,
-    };
-
-    let actor_ref = match mgr.get_ref(name) {
-        Some(r) => r,
-        None => return -1,
-    };
-
-    // Convert C struct to Rust message and fast_send
-    match msg_type {
-''')
-        # Generate message dispatch for fast_send
-        for msg in messages:
-            f.write(f'''        {msg.msg_id} => {{
-            let c_msg = unsafe {{ &*(msg_data as *const C{msg.name}) }};
-            let rust_msg = {msg.name}::from_c_struct(c_msg);
-            actor_ref.fast_send(Box::new(rust_msg), None);
-        }}
-''')
-
-        f.write('''        _ => return -2,
-    }
-
-    0
-}
 ''')
 
 def generate_rust_actor_if(messages: List[Message], output_dir: str):
@@ -797,13 +709,6 @@ extern "C" {
         const void* msg_data
     );
 
-    int32_t rust_actor_fast_send(
-        const char* actor_name,
-        const char* sender_name,
-        int32_t msg_type,
-        const void* msg_data
-    );
-
     int32_t rust_actor_exists(const char* name);
 }
 
@@ -814,8 +719,7 @@ namespace interop {
  *
  * Usage:
  *   RustActorIF rust_actor("my_rust_actor", "my_cpp_actor");
- *   rust_actor.send(msg::Ping{42});           // async
- *   rust_actor.fast_send(msg::Ping{42});      // sync (blocks until processed)
+ *   rust_actor.send(msg::Ping{42});           // async (fire-and-forget)
  */
 class RustActorIF {
 public:
@@ -831,21 +735,6 @@ public:
     int send(const Msg& msg) const {
         auto c_msg = msg.to_c_struct();
         return rust_actor_send(
-            actor_name_.c_str(),
-            sender_name_.empty() ? nullptr : sender_name_.c_str(),
-            Msg::ID,
-            &c_msg
-        );
-    }
-
-    /**
-     * Send a message synchronously (blocks until message is processed)
-     * Returns 0 on success, -1 if actor not found
-     */
-    template<typename Msg>
-    int fast_send(const Msg& msg) const {
-        auto c_msg = msg.to_c_struct();
-        return rust_actor_fast_send(
             actor_name_.c_str(),
             sender_name_.empty() ? nullptr : sender_name_.c_str(),
             Msg::ID,
@@ -894,13 +783,6 @@ extern "C" {
         msg_data: *const c_void,
     ) -> c_int;
 
-    fn cpp_actor_fast_send(
-        actor_name: *const c_char,
-        sender_name: *const c_char,
-        msg_type: c_int,
-        msg_data: *const c_void,
-    ) -> c_int;
-
     fn cpp_actor_exists(name: *const c_char) -> c_int;
 }
 
@@ -928,8 +810,7 @@ pub trait InteropMessage {
 ///
 /// Usage:
 ///   let cpp_actor = CppActorIF::new("my_cpp_actor", "my_rust_actor");
-///   cpp_actor.send(&Ping { count: 42 });           // async
-///   cpp_actor.fast_send(&Ping { count: 42 });      // sync (blocks until processed)
+///   cpp_actor.send(&Ping { count: 42 });           // async (fire-and-forget)
 pub struct CppActorIF {
     actor_name: CString,
     sender_name: Option<CString>,
@@ -953,24 +834,6 @@ impl CppActorIF {
             .unwrap_or(std::ptr::null());
         unsafe {
             cpp_actor_send(
-                self.actor_name.as_ptr(),
-                sender_ptr,
-                M::MSG_ID,
-                &c_msg as *const _ as *const c_void,
-            )
-        }
-    }
-
-    /// Send a message synchronously (blocks until message is processed)
-    /// Returns 0 on success, -1 if actor not found
-    pub fn fast_send<M: InteropMessage>(&self, msg: &M) -> i32 {
-        let c_msg = msg.to_c_struct();
-        let sender_ptr = self.sender_name
-            .as_ref()
-            .map(|s| s.as_ptr())
-            .unwrap_or(std::ptr::null());
-        unsafe {
-            cpp_actor_fast_send(
                 self.actor_name.as_ptr(),
                 sender_ptr,
                 M::MSG_ID,

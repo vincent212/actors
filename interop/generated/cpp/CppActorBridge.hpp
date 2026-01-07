@@ -35,13 +35,4 @@ int32_t cpp_actor_send(
     const void* msg_data
 );
 
-// Send a message to a C++ actor (sync - blocks until processed)
-// Returns 0 on success, -1 if actor not found, -2 if unknown message type
-int32_t cpp_actor_fast_send(
-    const char* actor_name,
-    const char* sender_name,
-    int32_t msg_type,
-    const void* msg_data
-);
-
 } // extern "C"

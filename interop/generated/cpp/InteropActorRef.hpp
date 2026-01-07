@@ -108,61 +108,6 @@ public:
         throw std::runtime_error("Unknown message type for FFI: " + std::to_string(msg_id));
     }
 
-    /**
-     * Send a message synchronously (blocks until processed)
-     */
-    void fast_send(const actors::Message* m, actors::Actor* sender = nullptr) const {
-        const char* sender_name_ptr = sender_name_.empty()
-            ? (sender ? sender->get_name() : nullptr)
-            : sender_name_.c_str();
-
-        int msg_id = m->get_message_id();
-
-        // Dispatch based on message ID (fast_send version)
-        if (msg_id == 1000) {
-            auto c_msg = static_cast<const msg::Ping*>(m)->to_c_struct();
-            rust_actor_fast_send(target_name_.c_str(), sender_name_ptr, 1000, &c_msg);
-            return;
-        }
-        if (msg_id == 1001) {
-            auto c_msg = static_cast<const msg::Pong*>(m)->to_c_struct();
-            rust_actor_fast_send(target_name_.c_str(), sender_name_ptr, 1001, &c_msg);
-            return;
-        }
-        if (msg_id == 1002) {
-            auto c_msg = static_cast<const msg::DataRequest*>(m)->to_c_struct();
-            rust_actor_fast_send(target_name_.c_str(), sender_name_ptr, 1002, &c_msg);
-            return;
-        }
-        if (msg_id == 1003) {
-            auto c_msg = static_cast<const msg::DataResponse*>(m)->to_c_struct();
-            rust_actor_fast_send(target_name_.c_str(), sender_name_ptr, 1003, &c_msg);
-            return;
-        }
-        if (msg_id == 1010) {
-            auto c_msg = static_cast<const msg::Subscribe*>(m)->to_c_struct();
-            rust_actor_fast_send(target_name_.c_str(), sender_name_ptr, 1010, &c_msg);
-            return;
-        }
-        if (msg_id == 1011) {
-            auto c_msg = static_cast<const msg::Unsubscribe*>(m)->to_c_struct();
-            rust_actor_fast_send(target_name_.c_str(), sender_name_ptr, 1011, &c_msg);
-            return;
-        }
-        if (msg_id == 1012) {
-            auto c_msg = static_cast<const msg::MarketUpdate*>(m)->to_c_struct();
-            rust_actor_fast_send(target_name_.c_str(), sender_name_ptr, 1012, &c_msg);
-            return;
-        }
-        if (msg_id == 1013) {
-            auto c_msg = static_cast<const msg::MarketDepth*>(m)->to_c_struct();
-            rust_actor_fast_send(target_name_.c_str(), sender_name_ptr, 1013, &c_msg);
-            return;
-        }
-
-        throw std::runtime_error("Unknown message type for FFI: " + std::to_string(msg_id));
-    }
-
     const std::string& name() const { return target_name_; }
     bool exists() const { return rust_actor_exists(target_name_.c_str()) != 0; }
 };
@@ -178,10 +123,6 @@ public:
 
     void send(const actors::Message* m, actors::Actor* sender = nullptr) {
         actor_->send(m, sender);
-    }
-
-    void fast_send(const actors::Message* m, actors::Actor* sender) {
-        actor_->fast_send(m, sender);
     }
 
     const char* name() const { return actor_->get_name(); }
@@ -228,13 +169,6 @@ public:
      */
     void send(const actors::Message* m, actors::Actor* sender = nullptr) {
         std::visit([&](auto& r) { r.send(m, sender); }, ref_);
-    }
-
-    /**
-     * Send a message synchronously
-     */
-    void fast_send(const actors::Message* m, actors::Actor* sender = nullptr) {
-        std::visit([&](auto& r) { r.fast_send(m, sender); }, ref_);
     }
 
     bool is_local() const { return std::holds_alternative<LocalActorRef>(ref_); }

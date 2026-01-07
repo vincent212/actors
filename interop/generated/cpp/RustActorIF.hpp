@@ -20,13 +20,6 @@ extern "C" {
         const void* msg_data
     );
 
-    int32_t rust_actor_fast_send(
-        const char* actor_name,
-        const char* sender_name,
-        int32_t msg_type,
-        const void* msg_data
-    );
-
     int32_t rust_actor_exists(const char* name);
 }
 
@@ -37,8 +30,7 @@ namespace interop {
  *
  * Usage:
  *   RustActorIF rust_actor("my_rust_actor", "my_cpp_actor");
- *   rust_actor.send(msg::Ping{42});           // async
- *   rust_actor.fast_send(msg::Ping{42});      // sync (blocks until processed)
+ *   rust_actor.send(msg::Ping{42});           // async (fire-and-forget)
  */
 class RustActorIF {
 public:
@@ -54,21 +46,6 @@ public:
     int send(const Msg& msg) const {
         auto c_msg = msg.to_c_struct();
         return rust_actor_send(
-            actor_name_.c_str(),
-            sender_name_.empty() ? nullptr : sender_name_.c_str(),
-            Msg::ID,
-            &c_msg
-        );
-    }
-
-    /**
-     * Send a message synchronously (blocks until message is processed)
-     * Returns 0 on success, -1 if actor not found
-     */
-    template<typename Msg>
-    int fast_send(const Msg& msg) const {
-        auto c_msg = msg.to_c_struct();
-        return rust_actor_fast_send(
             actor_name_.c_str(),
             sender_name_.empty() ? nullptr : sender_name_.c_str(),
             Msg::ID,

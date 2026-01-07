@@ -20,13 +20,6 @@ extern "C" {
         msg_data: *const c_void,
     ) -> c_int;
 
-    fn cpp_actor_fast_send(
-        actor_name: *const c_char,
-        sender_name: *const c_char,
-        msg_type: c_int,
-        msg_data: *const c_void,
-    ) -> c_int;
-
     fn cpp_actor_exists(name: *const c_char) -> c_int;
 }
 
@@ -105,8 +98,7 @@ impl InteropMessage for MarketDepth {
 ///
 /// Usage:
 ///   let cpp_actor = CppActorIF::new("my_cpp_actor", "my_rust_actor");
-///   cpp_actor.send(&Ping { count: 42 });           // async
-///   cpp_actor.fast_send(&Ping { count: 42 });      // sync (blocks until processed)
+///   cpp_actor.send(&Ping { count: 42 });           // async (fire-and-forget)
 pub struct CppActorIF {
     actor_name: CString,
     sender_name: Option<CString>,
@@ -130,24 +122,6 @@ impl CppActorIF {
             .unwrap_or(std::ptr::null());
         unsafe {
             cpp_actor_send(
-                self.actor_name.as_ptr(),
-                sender_ptr,
-                M::MSG_ID,
-                &c_msg as *const _ as *const c_void,
-            )
-        }
-    }
-
-    /// Send a message synchronously (blocks until message is processed)
-    /// Returns 0 on success, -1 if actor not found
-    pub fn fast_send<M: InteropMessage>(&self, msg: &M) -> i32 {
-        let c_msg = msg.to_c_struct();
-        let sender_ptr = self.sender_name
-            .as_ref()
-            .map(|s| s.as_ptr())
-            .unwrap_or(std::ptr::null());
-        unsafe {
-            cpp_actor_fast_send(
                 self.actor_name.as_ptr(),
                 sender_ptr,
                 M::MSG_ID,
