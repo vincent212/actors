@@ -1,0 +1,40 @@
+# Build artifacts
+*.a
+*.so
+*.o
+*.d
+*.pyc
+__pycache__/
+target/
+*.egg-info/
+build/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Rust
+Cargo.lock
+
+# Python
+*.egg
+.eggs/
+*.py[cod]
+.Python
+pip-log.txt
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log

@@ -1,0 +1,22 @@
+[package]
+name = "actors-interop"
+version = "0.1.0"
+edition = "2021"
+description = "FFI interop layer between actors-cpp and actors-rust"
+license = "MIT"
+
+[lib]
+name = "actors_interop"
+crate-type = ["staticlib", "cdylib", "rlib"]  # staticlib for C++ linking, cdylib for C linkage, rlib for Rust
+
+[dependencies]
+actors = { path = "../../rust" }
+lazy_static = "1.4"
+rand = "0.8"
+
+[build-dependencies]
+cc = "1.0"
+
+[profile.release]
+opt-level = 3
+lto = true

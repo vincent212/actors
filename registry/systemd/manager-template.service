@@ -1,0 +1,71 @@
+# Actor Manager Template Service
+#
+# THIS SOFTWARE IS OPEN SOURCE UNDER THE MIT LICENSE
+# Copyright 2025 Vincent Maciejewski, & M2 Tech
+#
+# Template for creating systemd services for actor managers.
+# Copy this file to /etc/systemd/system/manager-<name>.service
+# and customize for your manager.
+#
+# Example:
+#   sudo cp manager-template.service /etc/systemd/system/manager-pricer.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable manager-pricer
+#   sudo systemctl start manager-pricer
+
+[Unit]
+Description=Actor Manager: %i
+Documentation=https://github.com/your-org/actors
+After=network.target
+# Add dependencies on other managers if needed:
+# After=manager-registry.service
+
+[Service]
+Type=simple
+
+# User to run as (create 'actors' user or use your own)
+User=actors
+Group=actors
+
+# Working directory - where the manager binary/script is located
+WorkingDirectory=/opt/actors/managers/%i
+
+# Executable - customize path and args for your manager
+# For C++ managers:
+ExecStart=/opt/actors/managers/%i/%i
+# For Python managers:
+# ExecStart=/usr/bin/python3 /opt/actors/managers/%i/main.py
+# For Rust managers:
+# ExecStart=/opt/actors/managers/%i/%i
+
+# Environment variables
+Environment=REGISTRY_ENDPOINT=tcp://localhost:5555
+Environment=MANAGER_ID=%i
+# Add more environment variables as needed:
+# Environment=LOG_LEVEL=info
+# Environment=CONFIG_FILE=/etc/actors/%i.json
+
+# Restart policy
+Restart=on-failure
+RestartSec=2
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# Resource limits (optional)
+# LimitNOFILE=65536
+# LimitMEMLOCK=infinity
+# CPUAffinity=0-3
+
+# Security hardening (optional)
+# NoNewPrivileges=yes
+# ProtectSystem=strict
+# ProtectHome=yes
+# PrivateTmp=yes
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=manager-%i
+
+[Install]
+WantedBy=multi-user.target

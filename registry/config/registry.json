@@ -1,0 +1,47 @@
+{
+  "registry_endpoint": "tcp://0.0.0.0:5555",
+  "heartbeat_timeout_s": 6.0,
+  "heartbeat_check_interval_s": 1.0,
+  "hosts": {
+    "host1": {
+      "ssh": "actors@192.168.1.10",
+      "managers": {
+        "OrderProcessor": {
+          "service": "manager-order-processor",
+          "language": "cpp",
+          "description": "Handles order processing and routing"
+        },
+        "RiskChecker": {
+          "service": "manager-risk-checker",
+          "language": "python",
+          "description": "Risk validation service"
+        }
+      }
+    },
+    "host2": {
+      "ssh": "actors@192.168.1.11",
+      "managers": {
+        "Pricer": {
+          "service": "manager-pricer",
+          "language": "cpp",
+          "description": "Real-time pricing engine"
+        },
+        "MarketData": {
+          "service": "manager-market-data",
+          "language": "rust",
+          "description": "Market data feed handler"
+        }
+      }
+    },
+    "host3": {
+      "ssh": "actors@192.168.1.12",
+      "managers": {
+        "Analytics": {
+          "service": "manager-analytics",
+          "language": "python",
+          "description": "Real-time analytics and reporting"
+        }
+      }
+    }
+  }
+}

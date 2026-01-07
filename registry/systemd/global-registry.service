@@ -1,0 +1,53 @@
+# GlobalRegistry Service
+#
+# THIS SOFTWARE IS OPEN SOURCE UNDER THE MIT LICENSE
+# Copyright 2025 Vincent Maciejewski, & M2 Tech
+#
+# Runs the GlobalRegistry actor that provides actor name lookup
+# and heartbeat-based health monitoring.
+#
+# Install:
+#   sudo cp global-registry.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable global-registry
+#   sudo systemctl start global-registry
+
+[Unit]
+Description=Global Actor Registry
+Documentation=https://github.com/your-org/actors
+After=network.target
+
+[Service]
+Type=simple
+
+# User to run as
+User=actors
+Group=actors
+
+# Working directory
+WorkingDirectory=/opt/actors/registry
+
+# Run the GlobalRegistry Python script
+ExecStart=/usr/bin/python3 -m actors_registry.main
+
+# Configuration file path
+Environment=REGISTRY_CONFIG=/etc/actors/registry.json
+Environment=REGISTRY_ENDPOINT=tcp://0.0.0.0:5555
+Environment=LOG_LEVEL=info
+
+# Restart policy - registry is critical, always restart
+Restart=always
+RestartSec=2
+StartLimitIntervalSec=60
+StartLimitBurst=10
+
+# Resource limits
+LimitNOFILE=65536
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=global-registry
+
+[Install]
+WantedBy=multi-user.target
