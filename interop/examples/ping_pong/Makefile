@@ -1,16 +1,16 @@
 # Cross-Language Ping-Pong Example Makefile
 
 CXX = g++
-CXXFLAGS = -std=c++17 -O2 -Wall -Wextra -g
+CXXFLAGS = -std=c++20 -O2 -Wall -Wextra -g
 
 # Include paths
 INCLUDES = \
-    -I$(HOME)/actors/include \
+    -I$(HOME)/actors/cpp/include \
     -I$(HOME)/actors/interop/generated/cpp \
     -I$(HOME)/actors/interop/messages
 
 # Libraries
-ACTORS_CPP_LIB = $(HOME)/actors/src/libactors.a
+ACTORS_CPP_LIB = $(HOME)/actors/cpp/libactors.a
 RUST_LIB = $(HOME)/actors/interop/rust/target/release/libactors_interop.a
 
 # Link flags

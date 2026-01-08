@@ -125,7 +125,7 @@ public:
      */
     actors::Actor* get_any_actor(const std::string& name) const {
         // Check C++ actors first (parent implementation)
-        if (actors::Actor* actor = Manager::get_actor_by_name(name)) {
+        if (actors::Actor* actor = Manager::get_local_actor(name)) {
             return actor;
         }
 
@@ -163,7 +163,7 @@ public:
      */
     actors::ActorRef get_ref(const std::string& name) const {
         // Check C++ actors first
-        if (actors::Actor* actor = Manager::get_actor_by_name(name)) {
+        if (actors::Actor* actor = Manager::get_local_actor(name)) {
             return actors::ActorRef(actor);
         }
 

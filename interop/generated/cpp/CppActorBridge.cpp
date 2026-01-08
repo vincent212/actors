@@ -131,7 +131,7 @@ void cpp_actor_shutdown() {
 
 int32_t cpp_actor_exists(const char* name) {
     if (!name || !g_manager) return 0;
-    return g_manager->get_actor_by_name(name) != nullptr ? 1 : 0;
+    return g_manager->get_local_actor(name) != nullptr ? 1 : 0;
 }
 
 int32_t cpp_actor_send(
@@ -142,7 +142,7 @@ int32_t cpp_actor_send(
 ) {
     if (!actor_name || !msg_data || !g_manager) return -1;
 
-    actors::Actor* actor = g_manager->get_actor_by_name(actor_name);
+    actors::Actor* actor = g_manager->get_local_actor(actor_name);
     if (!actor) return -1;  // Actor not found
 
     actors::Actor* sender = get_sender_proxy(sender_name, actor_name);
