@@ -5,7 +5,7 @@
 2. [Core Architecture](#core-architecture)
 3. [Message System](#message-system)
 4. [Handler Registration](#handler-registration)
-5. [send() vs fast_send()](#send-vs-fast_send)
+5. [send() and reply()](#send-and-reply)
 6. [Queue Implementation](#queue-implementation)
 7. [Complete Working Example](#complete-working-example)
 8. [Best Practices](#best-practices)
@@ -57,9 +57,6 @@ protected:
   std::vector<generic_handler_t> handler_cache;  // 512 slots
   std::vector<bool> dont_have_handler;           // Cache misses
 
-  // Synchronization
-  std::mutex fast_send_mutex;
-
   // State
   bool terminated = false;
   Actor *group = nullptr;    // Parent group if member
@@ -70,7 +67,6 @@ public:
 
   // Message sending
   void send(const Message *m, Actor *sender) noexcept;
-  std::unique_ptr<const Message> fast_send(const Message *m, Actor *sender) noexcept;
 
   // Reply mechanism
   void reply(const Message *m) noexcept;
@@ -88,7 +84,6 @@ public:
 | `handlers` | Type-indexed map of handler function pointers |
 | `handler_cache[512]` | Fast lookup cache by message ID |
 | `dont_have_handler[512]` | Tracks cache misses to avoid repeated lookups |
-| `fast_send_mutex` | Protects synchronous RPC calls |
 | `msg_cnt` | Total messages processed by this Actor |
 | `affinity` | CPU core binding (set via Manager) |
 | `priority` | Thread priority (SCHED_FIFO, SCHED_RR, etc.) |
@@ -107,7 +102,6 @@ struct Message
   virtual int get_message_id() const = 0;
   mutable Actor *sender;      // Who sent this
   mutable Actor *destination; // Where it's going
-  mutable bool is_fast;       // Set by fast_send()
   mutable bool last;          // Is this the last message?
 };
 ```
@@ -245,7 +239,7 @@ bool Actor::call_handler(const Message *m) noexcept
 
 ---
 
-## send() vs fast_send()
+## send() and reply()
 
 ### send() - Asynchronous Message Passing
 
@@ -256,7 +250,6 @@ void Actor::send(const Message *m, Actor *sender) noexcept
 {
   if (terminated) return;
 
-  m->is_fast = false;
   m->sender = sender;
   m->destination = this;
 
@@ -269,7 +262,6 @@ void Actor::send(const Message *m, Actor *sender) noexcept
 - **Asynchronous**: Returns immediately
 - **Queued**: Message goes into queue
 - **Thread-safe**: Safe to call from any thread
-- **No return value**: Can't get response synchronously
 - **Memory**: Must use `new`; Actor deletes after processing
 
 **Example**:
@@ -281,66 +273,27 @@ market_data->send(new msg::PriceUpdate(99.5, timestamp), this);
 // The Actor will delete the message after processing
 ```
 
-### fast_send() - Synchronous RPC
-
-**Usage**: Request-response pattern, need immediate answer
+### reply() - Respond to Messages
 
 ```cpp
-std::unique_ptr<const Message> Actor::fast_send(
-  const Message *m, Actor *sender) noexcept
+void Actor::reply(const Message *m) noexcept
 {
-  std::lock_guard<std::mutex> lock(fast_send_mutex);
-
-  m->sender = sender;
-  m->is_fast = true;
-  m->last = true;
-  reply_message = nullptr;
-  using_fast_send = true;
-
-  // Call handler SYNCHRONOUSLY in caller's thread
-  bool called = call_handler(m);
-  if (!called)
-    process_message(m);
-
-  // Return reply (if any)
-  return std::unique_ptr<const Message>(reply_message);
-}
-```
-
-**Characteristics**:
-- **Synchronous**: Blocks until handler completes
-- **Return value**: Gets response immediately
-- **Stack-safe**: Can pass stack-allocated messages
-- **Mutex-protected**: Only one fast_send at a time
-- **Deadlock risk**: Never fast_send to same/lower priority Actor
-
-**Example**:
-
-```cpp
-// Query position (synchronous)
-msg::GetPosition query("AAPL");
-auto reply = position_mgr->fast_send(&query, this);
-
-if (reply) {
-  auto *pos = dynamic_cast<const msg::PositionResponse *>(reply.get());
-  if (pos) {
-    std::cout << "Position: " << pos->quantity << " @ " << pos->avg_price << std::endl;
+  if (reply_to) {
+    reply_to->send(m, this);
   }
 }
 ```
 
-### Comparison Table
+Use `reply()` to send a response back to the sender:
 
-| Aspect | send() | fast_send() |
-|---|---|---|
-| **Behavior** | Asynchronous | Synchronous RPC |
-| **Threading** | Receiver's thread | Caller's thread |
-| **Queuing** | Yes | None (direct call) |
-| **Return** | void | unique_ptr\<Message\> |
-| **Locking** | Lock-free | Mutex protected |
-| **Memory** | Heap only (`new`) | Stack or heap |
-| **Latency** | Higher (queued) | Lower (direct) |
-| **Best for** | Events, notifications | Queries, RPC |
+```cpp
+void get_position_handler(const msg::GetPosition *m) noexcept {
+  auto it = positions.find(m->symbol);
+  if (it != positions.end()) {
+    reply(new msg::PositionInfo(m->symbol, it->second, 0));
+  }
+}
+```
 
 ---
 
@@ -548,13 +501,7 @@ other->send(new msg::Trade(...), this);
 
 **DON'T**: Keep pointer or delete yourself (double-free)
 
-### 5. fast_send Safety
-
-**DO**: fast_send to higher-priority actors
-
-**DON'T**: fast_send to same/lower priority (deadlock risk)
-
-### 6. Actor Isolation
+### 5. Actor Isolation
 
 **DO**: Communicate only via messages
 
@@ -568,7 +515,7 @@ other->send(new msg::Trade(...), this);
 |---|---|
 | `include/actors/Actor.hpp` | Core Actor class and MESSAGE_HANDLER macro |
 | `include/actors/Message.hpp` | Message base classes |
-| `src/Actor.cpp` | send(), fast_send(), operator() implementation |
+| `src/Actor.cpp` | send(), reply(), operator() implementation |
 | `include/actors/act/Manager.hpp` | Actor lifecycle management |
 | `include/actors/act/Group.hpp` | Multi-actor single-thread container |
 | `include/actors/act/Timer.hpp` | Timer utilities |

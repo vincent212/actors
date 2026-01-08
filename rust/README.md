@@ -123,26 +123,16 @@ Cloneable handle for sending messages to an actor. Acts as the actor's "address"
 
 ## Messaging
 
-### Async Send (Fire-and-Forget)
+### Send (Fire-and-Forget)
 ```rust
 other_actor.send(Box::new(MyMessage { data: 42 }), ctx.self_ref());
 ```
 Message is queued and processed later by the receiver's thread.
 
-### Sync Send (RPC-style)
-```rust
-if let Some(reply) = other_actor.fast_send(Box::new(Request {}), ctx.self_ref()) {
-    if let Some(response) = reply.as_any().downcast_ref::<Response>() {
-        // Handle response
-    }
-}
-```
-Caller blocks until handler completes and returns a reply.
-
 ### Reply
 ```rust
 fn process_message(&mut self, msg: &dyn Message, ctx: &mut ActorContext) {
-    ctx.reply(Box::new(Response { result: 42 }));  // Works for both send() and fast_send()
+    ctx.reply(Box::new(Response { result: 42 }));
 }
 ```
 

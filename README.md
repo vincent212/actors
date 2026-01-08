@@ -101,23 +101,16 @@ Run multiple lightweight actors in a single thread.
 
 ## Messaging
 
-### Async Send (Fire-and-Forget)
+### Send (Fire-and-Forget)
 ```cpp
 other_actor->send(new MyMessage(data), this);
 ```
 Message is queued and processed later by the receiver's thread.
 
-### Sync Send (RPC-style)
-```cpp
-auto reply = other_actor->fast_send(new Request(), this);
-auto response = dynamic_cast<const Response*>(reply.get());
-```
-Handler runs immediately in caller's thread. Use for request/response patterns.
-
 ### Reply
 ```cpp
 void on_request(const Request* m) {
-  reply(new Response(m->id));  // Works for both send() and fast_send()
+  reply(new Response(m->id));
 }
 ```
 

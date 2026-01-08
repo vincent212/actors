@@ -40,7 +40,6 @@ Each actor runs in its own thread with its own queue:
 # Base class
 class ActorRef(ABC):
     def send(self, msg, sender=None): ...
-    def fast_send(self, msg, sender=None): ...
 
 # Local: uses Queue
 class LocalActorRef(ActorRef):
@@ -88,13 +87,11 @@ def process_message(self, envelope):
 class Envelope:
     msg: Any                    # The message
     sender: Optional[ActorRef]  # Who sent it (for replies)
-    reply_queue: Optional[Queue]  # For fast_send
 ```
 
 The envelope carries:
 - The message itself
 - The sender's ActorRef (for `reply()`)
-- A reply queue for synchronous `fast_send()`
 
 ## Sending Messages
 
@@ -105,23 +102,14 @@ The envelope carries:
 actor_ref.send(MyMessage(data=42), self._actor_ref)
 ```
 
-### fast_send() - Sync (RPC-style)
-
-```python
-# Blocks until reply received
-response = actor_ref.fast_send(Request(), self._actor_ref)
-```
-
 ### reply() - Respond to Messages
 
 ```python
 def on_request(self, env: Envelope):
-    # Works for both send() and fast_send()
     self.reply(env, Response(result=42))
 ```
 
-For `fast_send`, reply goes through `env.reply_queue`.
-For regular `send`, reply goes to `env.sender` mailbox.
+Reply goes to `env.sender` mailbox.
 
 ## Manager - Actor Registry
 

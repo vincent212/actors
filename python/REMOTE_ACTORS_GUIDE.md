@@ -464,9 +464,8 @@ The `Reject` message is also supported in Rust. When Rust rejects a message, Pyt
 
 ## Limitations
 
-1. **fast_send() not supported remotely** - Would need RPC mechanism
-2. **Messages must be registered** - Use `@register_message` decorator
-3. **Message fields must be JSON-serializable** - Use basic types
+1. **Messages must be registered** - Use `@register_message` decorator
+2. **Message fields must be JSON-serializable** - Use basic types
 
 ## Best Practices
 

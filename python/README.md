@@ -97,22 +97,16 @@ Wraps a message with sender info, enabling replies.
 
 ## Messaging
 
-### Async Send (Fire-and-Forget)
+### Send (Fire-and-Forget)
 ```python
 other_ref.send(MyMessage(data=42), self._actor_ref)
 ```
 Message is queued and processed later by the receiver's thread.
 
-### Sync Send (RPC-style)
-```python
-response = other_ref.fast_send(Request(), self._actor_ref)
-# Caller blocks until handler completes
-```
-
 ### Reply
 ```python
 def on_request(self, env: Envelope) -> None:
-    self.reply(env, Response(result=42))  # Works for both send() and fast_send()
+    self.reply(env, Response(result=42))
 ```
 
 ## Timers

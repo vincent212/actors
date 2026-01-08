@@ -64,7 +64,6 @@ Messages are wrapped in `Envelope` to carry routing metadata:
 pub struct Envelope {
     pub msg: Box<dyn Message>,      // The actual message
     pub sender: Option<ActorRef>,    // Who sent it (for replies)
-    pub reply_channel: Option<Sender<Box<dyn Message>>>,  // For fast_send
 }
 ```
 
@@ -86,44 +85,19 @@ Flow:
 3. Receiver's thread picks up envelope from queue
 4. Handler runs in receiver's thread
 
-### fast_send() - Sync (RPC-style)
-
-```rust
-// Caller BLOCKS until handler completes and returns reply
-// Handler runs in RECEIVER's thread
-let reply = actor_ref.fast_send(Box::new(Request {}), ctx.self_ref());
-if let Some(response) = reply {
-    // Process response
-}
-```
-
-Flow:
-1. Caller creates message and a temporary reply channel
-2. Message + reply channel sent through actor's channel
-3. Receiver's thread picks up envelope
-4. Handler runs, calls ctx.reply() which sends through reply channel
-5. Caller's recv() returns the reply
-6. Caller continues
-
-**Important**: fast_send still runs the handler in the receiver's thread.
-The "sync" part means the caller waits for the reply, not that it runs
-the handler itself.
-
 ### reply() - Respond to Messages
 
 ```rust
 impl Actor for MyActor {
     fn process_message(&mut self, msg: &dyn Message, ctx: &mut ActorContext) {
         if let Some(req) = msg.as_any().downcast_ref::<Request>() {
-            // This works for both send() and fast_send()
             ctx.reply(Box::new(Response { result: 42 }));
         }
     }
 }
 ```
 
-For `fast_send`, reply goes through the reply channel.
-For regular `send`, reply goes through the sender's ActorRef (if provided).
+Reply goes through the sender's ActorRef (if provided).
 
 ## ActorContext - Why It's Separate from Message
 
@@ -135,7 +109,6 @@ For regular `send`, reply goes through the sender's ActorRef (if provided).
 pub struct ActorContext {
     self_ref: Option<ActorRef>,           // This actor's mailbox address
     sender: Option<ActorRef>,             // Who sent the current message
-    reply_channel: Option<Sender<...>>,   // For fast_send replies
 }
 ```
 
@@ -159,7 +132,7 @@ fn on_request(&mut self, msg: &Request, ctx: &mut ActorContext) {
     // Note: &mut self is the actor's STATE, ctx.self_ref() is the actor's ADDRESS
     let my_address = ctx.self_ref();
 
-    // Send a reply (works for both send() and fast_send())
+    // Send a reply to the sender
     ctx.reply(Box::new(Response { result: 42 }));
 }
 ```
@@ -506,9 +479,8 @@ Used in Group for per-actor locks.
 
 1. **Keep actors lightweight** - Heavy computation blocks the message queue
 2. **Use Groups for many small actors** - Reduces thread overhead
-3. **Prefer send() over fast_send()** - Async is more scalable
-4. **Handle Shutdown gracefully** - Clean up resources in end()
-5. **Use Timer for periodic work** - Don't block in actors
+3. **Handle Shutdown gracefully** - Clean up resources in end()
+4. **Use Timer for periodic work** - Don't block in actors
 
 ## Error Handling
 
@@ -517,12 +489,6 @@ Channel operations can fail:
 ```rust
 // send() silently ignores errors (actor might be shut down)
 actor_ref.send(msg, None);
-
-// fast_send() returns Option (None if channel closed)
-match actor_ref.fast_send(msg, None) {
-    Some(reply) => { /* handle reply */ }
-    None => { /* actor unavailable */ }
-}
 ```
 
 ## Thread Safety
