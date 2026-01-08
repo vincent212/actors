@@ -23,6 +23,18 @@ Thumbs.db
 
 # Rust
 Cargo.lock
+**/*.rs.bk
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+java/target/
+*.iml
+.classpath
+.project
+.settings/
 
 # Python
 *.egg

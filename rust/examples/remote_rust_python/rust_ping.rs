@@ -41,7 +41,7 @@ fn register_messages() {
     register_remote_message::<Pong>("Pong");
 }
 
-/// PingActor sends Ping to Python pong, receives Pong back.
+/// PingActor sends Ping to pong, receives Pong back.
 struct PingActor {
     pong_ref: ActorRef,
     manager_handle: ManagerHandle,

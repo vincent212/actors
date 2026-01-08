@@ -79,22 +79,24 @@ int main() {
     // 2. Initialize C++ actor bridge with Manager pointer
     cpp_actor_init(&cpp_mgr);
 
-    // 3. Create Rust Manager and register RustPingActor
+    // 3. Create Rust Manager
     create_rust_manager();
-    void* rust_mgr = register_rust_ping_actor();
 
-    // 4. Initialize Rust actor bridge with Rust Manager pointer
-    rust_actor_init(rust_mgr);
-
-    // 5. Register C++ actor lookup so Rust can find C++ actors
+    // 4. Register C++ actor lookup so Rust can find C++ actors by name
     init_cpp_actor_lookup();
 
-    // 6. Start both Managers (sends Start message to actors)
+    // 5. Register RustPingActor (needs C++ lookup to find cpp_pong)
+    void* rust_mgr = register_rust_ping_actor();
+
+    // 6. Initialize Rust actor bridge with Rust Manager pointer
+    rust_actor_init(rust_mgr);
+
+    // 7. Start both Managers (sends Start message to actors)
     cout << "[Main] Starting actors..." << endl << endl;
     cpp_mgr.init();       // C++ actors receive Start
     rust_manager_init();  // Rust actors receive Start
 
-    // Wait for ping-pong to complete (3 rounds)
+    // Wait for ping-pong to complete (5 rounds)
     this_thread::sleep_for(chrono::milliseconds(500));
 
     // Shutdown

@@ -11,7 +11,7 @@ use std::ffi::CString;
 use std::sync::Mutex;
 use actors::{register_cpp_lookup, ActorRef, CppActorRef, Manager, ThreadConfig};
 use crate::ping_pong::RustPongActor;
-use crate::rust_ping::RustPingActor;
+use crate::rust_ping::PingActor;
 use crate::pubsub::RustPublisher;
 use crate::rust_subscriber::RustSubscriber;
 
@@ -34,15 +34,22 @@ pub extern "C" fn create_rust_manager() {
     guard.0 = ptr;
 }
 
-/// Register the RustPingActor with the Rust Manager
+/// Register the PingActor with the Rust Manager
 /// Returns the Manager pointer for rust_actor_init()
+/// Note: init_cpp_actor_lookup() must be called first so we can find cpp_pong
 #[no_mangle]
 pub extern "C" fn register_rust_ping_actor() -> *const Manager {
+    // Look up cpp_pong ActorRef BEFORE acquiring manager lock to avoid deadlock
+    // (cpp_actor_lookup doesn't need RUST_MANAGER lock)
+    let pong_ref = cpp_actor_lookup("cpp_pong", "rust_ping")
+        .expect("cpp_pong not found - call init_cpp_actor_lookup() first");
+
     let mut guard = RUST_MANAGER.lock().unwrap();
     if !guard.0.is_null() {
         let mgr = unsafe { &mut *guard.0 };
         let handle = mgr.get_handle();
-        let actor = RustPingActor::new(handle);
+
+        let actor = PingActor::new(pong_ref, handle);
         mgr.manage("rust_ping", Box::new(actor), ThreadConfig::default());
         guard.0 as *const Manager
     } else {

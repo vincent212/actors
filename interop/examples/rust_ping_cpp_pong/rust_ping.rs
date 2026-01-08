@@ -9,59 +9,38 @@
 use actors::{handle_messages, ActorContext, ActorRef, ManagerHandle};
 use actors::messages::Start;
 use crate::interop_messages::{Ping, Pong};
-use crate::rust_manager_ffi::get_actor_ref;
 
-pub struct RustPingActor {
-    /// ActorRef to C++ pong actor - location transparent!
-    cpp_pong: Option<ActorRef>,
+pub struct PingActor {
+    pong_ref: ActorRef,
     manager_handle: ManagerHandle,
 }
 
-impl RustPingActor {
-    pub fn new(manager_handle: ManagerHandle) -> Self {
-        RustPingActor {
-            // Will be looked up via get_actor_ref() on first use
-            cpp_pong: None,
-            manager_handle,
-        }
+impl PingActor {
+    pub fn new(pong_ref: ActorRef, manager_handle: ManagerHandle) -> Self {
+        PingActor { pong_ref, manager_handle }
     }
 
-    /// Get the pong ActorRef, looking it up if needed
-    fn get_pong(&mut self) -> Option<ActorRef> {
-        if self.cpp_pong.is_none() {
-            self.cpp_pong = get_actor_ref("cpp_pong", "rust_ping");
-        }
-        self.cpp_pong.clone()
-    }
-
-    fn on_start(&mut self, _msg: &Start, _ctx: &mut ActorContext) {
+    fn on_start(&mut self, _msg: &Start, ctx: &mut ActorContext) {
         println!("[Rust Ping] Starting ping-pong...");
         println!("[Rust Ping] Sending Ping #1");
-        let ping = Ping { count: 1 };
-        if let Some(pong) = self.get_pong() {
-            pong.send(Box::new(ping), None);
-        }
+        self.pong_ref.send(Box::new(Ping { count: 1 }), ctx.self_ref());
     }
 
-    fn on_pong(&mut self, msg: &Pong, _ctx: &mut ActorContext) {
+    fn on_pong(&mut self, msg: &Pong, ctx: &mut ActorContext) {
         println!("[Rust Ping] Received Pong #{}", msg.count);
 
-        if msg.count < 3 {
-            let next_count = msg.count + 1;
-            println!("[Rust Ping] Sending Ping #{}", next_count);
-            let ping = Ping { count: next_count };
-            if let Some(pong) = self.get_pong() {
-                pong.send(Box::new(ping), None);
-            }
-        } else {
+        if msg.count >= 5 {
             println!("[Rust Ping] Ping-pong complete!");
             self.manager_handle.terminate();
+        } else {
+            println!("[Rust Ping] Sending Ping #{}", msg.count + 1);
+            self.pong_ref.send(Box::new(Ping { count: msg.count + 1 }), ctx.self_ref());
         }
     }
 }
 
 // Register message handlers
-handle_messages!(RustPingActor,
+handle_messages!(PingActor,
     Start => on_start,
     Pong => on_pong
 );
